@@ -8,8 +8,6 @@ from cryptography.hazmat.backends import default_backend
 # Collapse sidebar and hide toggle
 st.set_page_config(initial_sidebar_state='collapsed')
 
-st.write(st.secrets)
-
 def get_secret(key):
     # First, try to get the secret from st.secrets (Streamlit Cloud)
     if key in st.secrets:
