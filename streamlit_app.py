@@ -8,10 +8,26 @@ from cryptography.hazmat.backends import default_backend
 # Collapse sidebar and hide toggle
 st.set_page_config(initial_sidebar_state='collapsed')
 
+def get_secret(key):
+    # First, try to get the secret from st.secrets (Streamlit Cloud)
+    if key in st.secrets:
+        return st.secrets[key]
+    # If not found, try to get it from environment variables (Codespaces)
+    elif key in os.environ:
+        return os.environ[key]
+    else:
+        raise ValueError(f"Secret {key} not found in st.secrets or environment variables.")
+
 # Retrieve Snowflake connection parameters from environment variables
-snowflake_user = os.getenv("SF_USERNAME")
-snowflake_account = os.getenv("SF_ACCOUNT")
-snowflake_private_key = os.getenv("SF_PRIVATE_KEY")
+# Usage
+try:
+    snowflake_user = get_secret("SF_USERNAME")
+    snowflake_account = get_secret("SF_ACCOUNT")
+    snowflake_private_key = get_secret("SF_PRIVATE_KEY")
+    # Use these secrets as needed
+except ValueError as e:
+    st.error(str(e))
+    
 snowflake_warehouse = "GENERAL_USE_WH"
 snowflake_database = "OMETIS_APPLICATIONS"
 snowflake_schema = "FEEDBACK_APP"
