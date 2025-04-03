@@ -8,6 +8,8 @@ from cryptography.hazmat.backends import default_backend
 # Collapse sidebar and hide toggle
 st.set_page_config(initial_sidebar_state='collapsed')
 
+st.write(st.secrets)
+
 def get_secret(key):
     # First, try to get the secret from st.secrets (Streamlit Cloud)
     if key in st.secrets:
@@ -27,7 +29,7 @@ try:
     # Use these secrets as needed
 except ValueError as e:
     st.error(str(e))
-    
+
 snowflake_warehouse = "GENERAL_USE_WH"
 snowflake_database = "OMETIS_APPLICATIONS"
 snowflake_schema = "FEEDBACK_APP"
