@@ -1,37 +1,115 @@
 import streamlit as st
+import json
+import uuid
+import datetime
 
-def render():
+def render(request_data: dict, conn):
     st.header("Education Feedback Form")
 
-    # Feedback form fields
-    name = st.text_input("Your Name", value="Name Surname", disabled=True)
-    company = st.text_input("Company (if relevant)", value="A Company", disabled=True)
-    email = st.text_input("Your Email", value="name.surname@company.com" ,disabled=True)
-    course = st.text_input("Course Attended", value="Qlik Sense Data Visualisation", disabled=True)
+    # Parse the EMPLOYEES_JSON field (instructors) into a list
+    try:
+        employees_raw = request_data.get("EMPLOYEES_JSON", "[]")
+        instructors = json.loads(employees_raw) if isinstance(employees_raw, str) else employees_raw
+    except json.JSONDecodeError:
+        instructors = []
+
+    instructor_names = ", ".join([i.get("name", "Unknown") for i in instructors])
+
+    # Display attendee and course info
+    st.subheader("Your details:")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"**Name:** {request_data.get('NAME', 'Unknown')}")
+    with col2:
+        st.markdown(f"**Company:** {request_data.get('COMPANY', 'Unknown')}")
+    with col3:
+        st.markdown(f"**Email:** {request_data.get('EMAIL', 'Unknown')}")
+
+    st.markdown(f"**Course:** {request_data.get('COURSE_NAME', 'Unknown')}")
+    st.markdown(f"**Course Completed:** {request_data.get('COURSE_DATE', 'Unknown')}")
+    st.markdown(f"**Educator(s):** {instructor_names or 'None'}")
+
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.header("Education feedback")
-    st.markdown("We sincerely appreciate you taking the time to provide us with your valuable feedback. Your insights are crucial in helping us enhance our services and better meet your needs. Thank you for contributing to our continuous improvement.")
+    st.header("Education Feedback")
+    st.markdown("We sincerely appreciate your time and feedback to help us improve.")
     st.markdown("Please score us between 1-10 (0 = no response)")
+
     nps = st.slider("Would you recommend Ometis Education and their courses to a friend or colleague in the future?", 0, 10)
+
+    # Optional course-specific feedback
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.header("Optional questions")
-    overall = st.slider("Considering content, delivery, and materials, how would you rate the training overall?", 0, 10)
-    objectives = st.slider("Did the training meet your expected objectives?", 0, 10)
-    materials = st.slider("Did the training materials effectively support your learning?", 0, 10)
-    balance = st.slider("Was the balance between instructor-led activities and exercises appropriate?", 0, 10)
-    knowledge = st.slider("Was the instructor was knowledgeable on the subject?", 0, 10)
-    manner = st.slider("Did the instructor deliver the training in a clear and engaging manner?", 0, 10)
-    pace = st.slider("Was the pace of the training was suitable?", 0, 10)
-    questions = st.slider("Was there adequate time allocated for questions and discussions?", 0, 10)
+    st.header("Course Feedback")
+    course_feedback = {
+        "overall": st.slider("Overall training quality", 0, 10),
+        "objectives": st.slider("Training met your objectives", 0, 10),
+        "materials": st.slider("Materials supported your learning", 0, 10),
+        "balance": st.slider("Instructor-led vs exercises balance", 0, 10),
+        "knowledge": st.slider("Instructor knowledge", 0, 10),
+        "manner": st.slider("Instructor delivery quality", 0, 10),
+        "pace": st.slider("Training pace", 0, 10),
+        "questions": st.slider("Time for questions and discussion", 0, 10)
+    }
 
+    comments = st.text_area("Are there specific aspects of the training you believe could be improved?")
 
-    comments = st.text_area("Are there specific aspects of the training you believe could be improved? Please provide details.")
+    person_feedback = []
+    for instructor in instructors:
+        with st.expander(f"Feedback for {instructor['name']}", expanded=True):
+            person_feedback.append({
+                "person_id": instructor.get("id"),
+                "name": instructor.get("name"),
+                "role": "instructor",
+                "comments": st.text_area(f"Comments about {instructor['name']}:", key=f"comments_{instructor['id']}")
+            })
 
     if st.button("Submit Feedback"):
         if nps == 0:
-            st.error("Please provide a rating for the mandatory question between 1 and 10 (0 is no response)")
+            st.error("Please provide a rating for the mandatory NPS question.")
         else:
-            st.success("Thank you for your feedback!")
+            try:
+                feedback_id = str(uuid.uuid4())
+                submitted_at = datetime.datetime.utcnow()
 
+                payload = {
+                    "nps": nps,
+                    "course_feedback": course_feedback,
+                    "person_feedback": person_feedback,
+                    "general_comments": comments,
+                    "contact_preference": "N/A"
+                }
 
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO feedback_app.feedback (
+                            feedback_id, request_id, submitted_at, nps_score,
+                            person_feedback, course_feedback, general_comments, contact_preference, raw_payload
+                        )
+                        SELECT %s, %s, %s, %s,
+                               PARSE_JSON(%s), PARSE_JSON(%s), %s, %s, PARSE_JSON(%s)
+                    """, (
+                        feedback_id,
+                        request_data.get("TOKEN"),
+                        submitted_at,
+                        nps,
+                        json.dumps(person_feedback),
+                        json.dumps(course_feedback),
+                        comments,
+                        "N/A",
+                        json.dumps(payload)
+                    ))
 
+                    cur.execute("""
+                        UPDATE FEEDBACK_REQUESTS
+                        SET FLAG_FEEDBACK_RECEIVED = TRUE,
+                            FEEDBACK_RECEIVED_AT = CURRENT_TIMESTAMP()
+                        WHERE TOKEN = %s
+                    """, (request_data.get("TOKEN"),))
+
+                    conn.commit()
+
+                st.query_params.clear()
+                st.query_params.update({"page": "thanks"})
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
