@@ -1,10 +1,16 @@
 import streamlit as st
 import json
 import uuid
-import datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+slider_options= ['N/A',0,1,2,3,4,5,6,7,8,9,10]
+
 
 def render(request_data: dict, conn):
     st.header("Education Feedback Form")
+    ##submitted_at = datetime.now(ZoneInfo("Europe/London"))
+    ##st.write(submitted_at)
 
     # Parse the EMPLOYEES_JSON field (instructors) into a list
     try:
@@ -32,22 +38,22 @@ def render(request_data: dict, conn):
     st.markdown("<hr>", unsafe_allow_html=True)
     st.header("Education Feedback")
     st.markdown("We sincerely appreciate your time and feedback to help us improve.")
-    st.markdown("Please score us between 1-10 (0 = no response)")
+    st.markdown("Please score us between 0 (not at all likely) and 10 (extremely likely)")
 
-    nps = st.slider("Would you recommend Ometis Education and their courses to a friend or colleague in the future?", 0, 10)
+    nps = st.select_slider("Would you recommend Ometis Education and their courses to a friend or colleague in the future?", options=slider_options, value=slider_options[0])
 
     # Optional course-specific feedback
     st.markdown("<hr>", unsafe_allow_html=True)
     st.header("Course Feedback")
     course_feedback = {
-        "overall": st.slider("Overall training quality", 0, 10),
-        "objectives": st.slider("Training met your objectives", 0, 10),
-        "materials": st.slider("Materials supported your learning", 0, 10),
-        "balance": st.slider("Instructor-led vs exercises balance", 0, 10),
-        "knowledge": st.slider("Instructor knowledge", 0, 10),
-        "manner": st.slider("Instructor delivery quality", 0, 10),
-        "pace": st.slider("Training pace", 0, 10),
-        "questions": st.slider("Time for questions and discussion", 0, 10)
+        "overall": st.select_slider("Overall training quality", options=slider_options, value=slider_options[0]),
+        "objectives": st.select_slider("Training met your objectives", options=slider_options, value=slider_options[0]),
+        "materials": st.select_slider("Materials supported your learning", options=slider_options, value=slider_options[0]),
+        "balance": st.select_slider("Instructor-led vs exercises balance", options=slider_options, value=slider_options[0]),
+        "knowledge": st.select_slider("Instructor knowledge", options=slider_options, value=slider_options[0]),
+        "manner": st.select_slider("Instructor delivery quality", options=slider_options, value=slider_options[0]),
+        "pace": st.select_slider("Training pace", options=slider_options, value=slider_options[0]),
+        "questions": st.select_slider("Time for questions and discussion", options=slider_options, value=slider_options[0])
     }
 
     comments = st.text_area("Are there specific aspects of the training you believe could be improved?")
@@ -63,12 +69,12 @@ def render(request_data: dict, conn):
             })
 
     if st.button("Submit Feedback"):
-        if nps == 0:
-            st.error("Please provide a rating for the mandatory NPS question.")
+        if nps == 'N/A':
+            st.error("Please provide a rating for whether you would recommend Ometis Education.")
         else:
             try:
                 feedback_id = str(uuid.uuid4())
-                submitted_at = datetime.datetime.utcnow()
+                submitted_at = datetime.now(ZoneInfo("Europe/London"))
 
                 payload = {
                     "nps": nps,
@@ -101,7 +107,7 @@ def render(request_data: dict, conn):
                     cur.execute("""
                         UPDATE FEEDBACK_REQUESTS
                         SET FLAG_FEEDBACK_RECEIVED = TRUE,
-                            FEEDBACK_RECEIVED_AT = CURRENT_TIMESTAMP()
+                            FEEDBACK_RECEIVED_AT = CONVERT_TIMEZONE('UTC', 'Europe/London', CURRENT_TIMESTAMP())
                         WHERE TOKEN = %s
                     """, (request_data.get("TOKEN"),))
 

@@ -56,7 +56,12 @@ logo_url = "https://ometis.co.uk/hs-fs/hubfs/ometis%20orange%20transparent-1.png
 st.image(logo_url, width=200)
 
 # App title
-st.title("Ometis Feedback Application")
+
+st.markdown("""
+    <div style="background-color:#00586F; padding:1rem; border-radius:0.5rem; margin-bottom:1rem;">
+        <h1 style="color:white; margin:0;">Ometis Feedback Application</h1>
+    </div>
+""", unsafe_allow_html=True)
 
 # Get the token passed in the URL query parameters
 token = st.query_params.get("token")

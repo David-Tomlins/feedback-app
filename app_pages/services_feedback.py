@@ -1,7 +1,11 @@
 import streamlit as st
 import json
 import uuid
-import datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+nps_slider_options= ['N/A',0,1,2,3,4,5,6,7,8,9,10]
+slider_options= ['N/A',0,1,2,3,4,5,]
 
 def render(request_data: dict, conn):
     st.header("Services Feedback Form")
@@ -32,15 +36,14 @@ def render(request_data: dict, conn):
 
     st.markdown("<hr>", unsafe_allow_html=True)
     st.header("Project Feedback")
-    st.markdown("We sincerely appreciate you taking the time to provide us with your valuable feedback.")
-    st.markdown("Please score us between 1-10 (0 = no response)")
+    st.markdown("We sincerely appreciate your time and feedback to help us improve.")
+    st.markdown("Please score us between 0 (not at all likely) and 10 (extremely likely)")
 
-    # Mandatory NPS question
-    nps = st.slider("Would you recommend Ometis Consulting Services to a friend or colleague in the future?", 0, 10)
+    nps = st.select_slider("Would you recommend Ometis Education and their courses to a friend or colleague in the future?", options=nps_slider_options, value=nps_slider_options[0])
 
     st.markdown("<hr>", unsafe_allow_html=True)
     st.header("Optional Questions on Your Consultants")
-    st.markdown("1: Very poor to 5: Excellent (0 = no response)")
+    st.markdown("1: Poor to 5: Excellent")
 
     # Per-consultant feedback
     person_feedback = []
@@ -50,30 +53,30 @@ def render(request_data: dict, conn):
                 "person_id": consultant["id"],
                 "name": consultant["name"],
                 "role": "consultant",
-                "quality_of_work": st.slider("Quality of work", 0, 5, key=f"quality_{consultant['id']}"),
-                "communication": st.slider("Communication", 0, 5, key=f"communication_{consultant['id']}"),
-                "technical_capability": st.slider("Technical capability and advice", 0, 5, key=f"technical_{consultant['id']}"),
-                "adaptability": st.slider("Adaptability", 0, 5, key=f"adaptability_{consultant['id']}"),
-                "problem_solving": st.slider("Problem Solving", 0, 5, key=f"problem_solving_{consultant['id']}"),
+                "quality_of_work": st.select_slider("Quality of work", options=slider_options, value=slider_options[0], key=f"quality_{consultant['id']}"),
+                "communication": st.select_slider("Communication", options=slider_options, value=slider_options[0], key=f"communication_{consultant['id']}"),
+                "technical_capability": st.select_slider("Technical capability and advice", options=slider_options, value=slider_options[0], key=f"technical_capability_{consultant['id']}"),
+                "adaptability": st.select_slider("Adaptability", options=slider_options, value=slider_options[0], key=f"adaptability_{consultant['id']}"),
+                "problem_solving": st.select_slider("Problem Solving", options=slider_options, value=slider_options[0], key=f"problem_solving_{consultant['id']}"),
                 "comments": st.text_area(f"Are there specific comments you want to make about {consultant['name']}? Please provide details.", key=f"comments_{consultant['id']}")
             }
             person_feedback.append(feedback)
 
-    general_comments = st.text_area("Are there any other aspects that you believe could be improved?")
+    general_comments = st.text_area("Are there any other aspects that you would like to comment on?")
 
     contact_preference = st.radio(
-        "By default, we send this feedback form after a piece of work has been completed. Please let us know your preference:",
+        "By default, we send this feedback request after a piece of work has been completed. Please let us know your preference:",
         ["Yes this is fine", "I would prefer less often", "I would prefer you did not contact me again"]
     )
 
     # Submit feedback
     if st.button("Submit Feedback"):
-        if nps == 0:
+        if nps == 'N/A':
             st.error("Please provide a rating for the main NPS question (0 is no response).")
         else:
             try:
                 feedback_id = str(uuid.uuid4())
-                submitted_at = datetime.datetime.utcnow()
+                submitted_at = datetime.now(ZoneInfo("Europe/London"))
 
                 payload = {
                     "nps": nps,
@@ -104,7 +107,7 @@ def render(request_data: dict, conn):
                     cur.execute("""
                         UPDATE FEEDBACK_REQUESTS
                         SET FLAG_FEEDBACK_RECEIVED = TRUE,
-                            FEEDBACK_RECEIVED_AT = CURRENT_TIMESTAMP()
+                            FEEDBACK_RECEIVED_AT = CONVERT_TIMEZONE('UTC', 'Europe/London', CURRENT_TIMESTAMP())
                         WHERE TOKEN = %s
                     """, (request_data.get("TOKEN"),))
 
